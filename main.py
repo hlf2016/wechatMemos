@@ -114,9 +114,9 @@ async def wechat_post(request: Request, signature: str, timestamp: str, nonce: s
                 },
                 data=memoJson
             ).json()
-            print(memo, res)
-            if res.get('data', None) != None:
-                responseMsg = "Memo保存成功"
+            # print(memo, res)
+            if res.get('id', None) != None:
+                responseMsg = f"Memo {res.get('id')} 保存成功"
             else:
                 responseMsg = "Memo保存失败 原因"+res
             return Response(Message(to_user, from_user, responseMsg).send(), media_type="application/xml")
