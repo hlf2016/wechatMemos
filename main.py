@@ -1,9 +1,13 @@
-import hashlib,uvicorn,requests,json,redis
+import hashlib
+import uvicorn
+import requests
+import json
+import redis
 from typing import Union
 from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 from Plugins.WechatMessage import parse_xml, Message
-from starlette.responses import RedirectResponse,HTMLResponse,Response
+from starlette.responses import RedirectResponse, HTMLResponse, Response
 from starlette.staticfiles import StaticFiles
 from configparser import ConfigParser
 from basic import Basic
@@ -11,7 +15,7 @@ from basic import Basic
 
 # https://github.com/vastsa/Wechat-Fastapi
 
-app = FastAPI(title="Wechat Memos",version='1',)
+app = FastAPI(title="Wechat Memos", version='1',)
 # 读取配置文件
 cfg = ConfigParser()
 cfg.read('config.ini')
@@ -20,13 +24,15 @@ cfg.read('config.ini')
 # appSecret = cfg.get('wechat', 'app_secret')
 token = cfg.get('wechat', 'token')
 memos_open_api = cfg.get('memos', 'open_api')
+memos_access_token = cfg.get('memos', 'access_token')
 redis_host = cfg.get('redis', 'host')
 redis_port = cfg.get('redis', 'port')
 redis_db = cfg.get('redis', 'db')
 # print(memos_open_api,redis_host,redis_port)
 # print(token, Basic().get_access_token())
 
-rds = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db,decode_responses=True)
+rds = redis.StrictRedis(host=redis_host, port=redis_port,
+                        db=redis_db, decode_responses=True)
 
 # def getAccessToken(appId, appSecret):
 #     accessTokenKey = 'wechatAccessToken'
@@ -54,6 +60,7 @@ app.add_middleware(
 
 # app.mount('/static', StaticFiles(directory='static'), name='static')
 
+
 @app.get("/wechat")
 def wechat(signature: str, echostr: int, timestamp: str, nonce: str):
     try:
@@ -62,7 +69,7 @@ def wechat(signature: str, echostr: int, timestamp: str, nonce: str):
         # map函数在Python 2.x 返回列表，Python 3.x 返回迭代器。update函数在老版本中可以用字符串，在3.5版本中必须用字节了。
         s = list[0]+list[1]+list[2]
         sha1 = hashlib.sha1()
-        sha1.update(bytes(s,"utf8"))
+        sha1.update(bytes(s, "utf8"))
         hashcode = sha1.hexdigest()
         print("handle/GET func: hashcode, signature: ", hashcode, signature)
         if hashcode == signature:
@@ -70,12 +77,12 @@ def wechat(signature: str, echostr: int, timestamp: str, nonce: str):
         else:
             return ""
     except Exception as e:
-        logging.exception(e)
+        print(e)
         return e
 
 
 @app.post("/wechat")
-async def wechat_post(request: Request,signature: str, timestamp: str, nonce: str, openid: str):
+async def wechat_post(request: Request, signature: str, timestamp: str, nonce: str, openid: str):
     try:
         rec_msg = parse_xml(await request.body())
         to_user = rec_msg.FromUserName
@@ -99,7 +106,14 @@ async def wechat_post(request: Request,signature: str, timestamp: str, nonce: st
         elif memo != '' and rds.get(open_id_key):
             # print(rds.get(open_id_key))
             memoJson = json.dumps({"content": memo})
-            res = requests.post(url=memos_open_api,headers={"Content-type":"application/json"}, data=memoJson).json()
+            res = requests.post(
+                url=memos_open_api,
+                headers={
+                    "Content-type": "application/json",
+                    "Authorization": "Bearer "+memos_access_token
+                },
+                data=memoJson
+            ).json()
             # print(memo, res)
             if res.get('data', None) != None:
                 responseMsg = "Memo保存成功"
@@ -110,4 +124,3 @@ async def wechat_post(request: Request,signature: str, timestamp: str, nonce: st
             return HTMLResponse('success')
     except:
         return HTMLResponse('success')
-        
